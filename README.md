@@ -3,25 +3,35 @@
 API do mini-projeto Full Stack desenvolvido para o processo seletivo
 de Desenvolvedor de Sistemas Júnior da bit Soluções.
 
-## Objetivo
+## Estado atual
 
-Permitir que usuários cadastrem e acompanhem suas próprias solicitações
-internas, com autenticação, filtros e indicadores.
+Base Spring Boot implementada.
 
-## Estado do projeto
+Disponível:
+- Build e verificação pelo Maven Wrapper.
+- Endpoint de saúde.
+- Dockerfile com build em múltiplos estágios.
+- Docker Compose com backend e PostgreSQL.
+- CI com verificação Maven e build da imagem Docker.
 
-Em desenvolvimento. Este commit estabelece a base do repositório;
-a aplicação ainda não foi implementada.
+Ainda não implementado:
+- Conexão da aplicação ao banco e migrations.
+- Cadastro e autenticação.
+- Solicitações e dashboard.
 
-## Planejamento técnico
+## Tecnologias desta etapa
 
-- Java 21 e Spring Boot.
-- PostgreSQL, Spring Data JPA, Hibernate e Flyway.
-- Spring Security com JWT e refresh token.
-- Clean Architecture, SOLID e DDD.
-- Docker, Docker Compose e GitHub Actions desde a estrutura inicial.
-- Documentação atualizada junto com cada implementação.
+- Java 21.
+- Spring Boot 4.1.1.
+- Maven Wrapper, configurado para Maven 3.9.16.
+- Spring Web MVC, Validation e Actuator.
+- Docker, Docker Compose e PostgreSQL 16.
+- GitHub Actions.
 
-## Backend
+## Execução local
 
-https://github.com/JoseWenned/portal-solicitacoes-backend
+Pré-requisito: JDK 21.
+
+```bash
+chmod +x mvnw
+./mvnw spring-boot:run
