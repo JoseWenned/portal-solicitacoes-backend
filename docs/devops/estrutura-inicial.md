@@ -20,7 +20,9 @@ de imagens.
 ## Limitações atuais
 
 - Persistência, migrations e autenticação ainda não implementadas.
-- A CI ainda não verifica a execução integrada dos containers.
+- GitHub Actions: workflow Backend CI #1 concluído com sucesso
+  no commit 93d45d0.
+- Evidência: https://github.com/JoseWenned/portal-solicitacoes-backend/actions/runs/36969544921
 - Imagens Docker usam tags de versão; digests ainda não foram fixados.
 - O ambiente local apresentou aviso de ausência do plugin Buildx.
   A imagem foi construída com sucesso pelo builder clássico.

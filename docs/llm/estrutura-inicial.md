@@ -20,4 +20,5 @@ O desenvolvedor aplicou as configurações e informou os resultados:
 - Backend no Compose: em execução.
 - Endpoint /actuator/health: status UP.
 
-A execução do workflow no GitHub Actions permanece pendente.
+O desenvolvedor informou que o workflow Backend CI #1 foi concluído
+com sucesso no GitHub Actions, no commit 93d45d0.
