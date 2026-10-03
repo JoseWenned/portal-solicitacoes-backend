@@ -6,7 +6,7 @@ import jakarta.validation.constraints.Size;
 
 import java.util.Locale;
 
-public record CadastrarUsuarioRequest(
+public record CadastrarUsuarioRequestDTO(
     @NotBlank(message = "O nome é obrigatório.")
     @Size(max = 200, message = "O nome informado é muito longo.")
     String name,
@@ -21,7 +21,7 @@ public record CadastrarUsuarioRequest(
     String password
 ) {
 
-    public CadastrarUsuarioRequest {
+    public CadastrarUsuarioRequestDTO {
         name = name == null ? null : name.strip();
         email = email == null
             ? null

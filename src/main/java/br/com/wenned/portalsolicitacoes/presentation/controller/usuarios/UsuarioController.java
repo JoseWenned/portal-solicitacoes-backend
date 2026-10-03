@@ -1,8 +1,8 @@
 package br.com.wenned.portalsolicitacoes.presentation.controller.usuarios;
 
 import br.com.wenned.portalsolicitacoes.application.usecase.usuarios.CadastrarUsuarioUseCase;
-import br.com.wenned.portalsolicitacoes.presentation.dto.usuarios.CadastrarUsuarioRequest;
-import br.com.wenned.portalsolicitacoes.presentation.dto.usuarios.UsuarioResponse;
+import br.com.wenned.portalsolicitacoes.presentation.dto.usuarios.CadastrarUsuarioRequestDTO;
+import br.com.wenned.portalsolicitacoes.presentation.dto.usuarios.UsuarioResponseDTO;
 
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -19,8 +19,8 @@ public class UsuarioController {
     }
 
     @PostMapping
-    public ResponseEntity<UsuarioResponse> cadastrar(
-        @Valid @RequestBody CadastrarUsuarioRequest request
+    public ResponseEntity<UsuarioResponseDTO> cadastrar(
+        @Valid @RequestBody CadastrarUsuarioRequestDTO request
     ) {
         var resultado = cadastrarUsuario.execute(
             request.name(),
@@ -28,7 +28,7 @@ public class UsuarioController {
             request.password()
         );
 
-        UsuarioResponse response = new UsuarioResponse(
+        UsuarioResponseDTO response = new UsuarioResponseDTO(
             resultado.id(),
             resultado.name(),
             resultado.email(),

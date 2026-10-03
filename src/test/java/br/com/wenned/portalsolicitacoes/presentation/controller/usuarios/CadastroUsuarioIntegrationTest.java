@@ -1,5 +1,7 @@
 package br.com.wenned.portalsolicitacoes.presentation.controller.usuarios;
 
+import org.springframework.test.context.ActiveProfiles;
+
 import com.jayway.jsonpath.JsonPath;
 
 import org.junit.jupiter.api.Test;
@@ -29,6 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Testcontainers
+@ActiveProfiles("test")
 class CadastroUsuarioIntegrationTest {
 
     @Container

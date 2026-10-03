@@ -1,6 +1,7 @@
 package br.com.wenned.portalsolicitacoes.presentation.exception;
 
 import br.com.wenned.portalsolicitacoes.domain.exception.usuarios.EmailJaCadastradoException;
+import br.com.wenned.portalsolicitacoes.domain.exception.autenticacao.AutenticacaoInvalidaException;
 
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
@@ -102,6 +103,20 @@ public class ApiExceptionHandler {
             HttpStatus.INTERNAL_SERVER_ERROR,
             "INTERNAL_ERROR",
             "Não foi possível concluir a operação.",
+            request,
+            List.of()
+        );
+    }
+
+    @ExceptionHandler(AutenticacaoInvalidaException.class)
+    public ResponseEntity<ApiError> authentication(
+        AutenticacaoInvalidaException exception,
+        HttpServletRequest request
+    ) {
+        return response(
+            HttpStatus.UNAUTHORIZED,
+            "AUTHENTICATION_FAILED",
+            exception.getMessage(),
             request,
             List.of()
         );

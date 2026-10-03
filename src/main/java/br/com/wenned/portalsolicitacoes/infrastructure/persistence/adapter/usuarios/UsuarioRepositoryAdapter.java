@@ -7,6 +7,9 @@ import br.com.wenned.portalsolicitacoes.infrastructure.persistence.mapper.usuari
 import br.com.wenned.portalsolicitacoes.infrastructure.persistence.model.usuarios.UsuarioModel;
 import br.com.wenned.portalsolicitacoes.infrastructure.persistence.repository.usuarios.UsuarioRepositoryJPA;
 
+import java.util.Optional;
+import java.util.UUID;
+
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
@@ -23,6 +26,18 @@ public class UsuarioRepositoryAdapter implements UsuarioRepository {
     @Override
     public boolean existsByEmail(String email) {
         return repository.existsByEmail(email);
+    }
+
+    @Override
+    public Optional<Usuario> findByEmail(String email) {
+        return repository.findByEmail(email)
+            .map(UsuarioMapper::toDomain);
+    }
+
+    @Override
+    public Optional<Usuario> findById(UUID id) {
+        return repository.findById(id)
+            .map(UsuarioMapper::toDomain);
     }
 
     @Override

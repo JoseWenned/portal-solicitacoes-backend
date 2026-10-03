@@ -57,7 +57,8 @@ Resultados informados:
 - Testes de integração: 6 executados, sem falhas, erros ou ignorados.
 - Suíte completa com ./mvnw verify: 28 testes, sem falhas,
   erros ou ignorados; BUILD SUCCESS.
-- CI desta branch: pendente.
+- CI do PR de cadastro: concluída com sucesso, conforme resultado
+  informado pelo desenvolvedor.
 
 Os testes de integração verificam persistência, correspondência
 do hash BCrypt com a senha, rejeição de e-mail duplicado,
