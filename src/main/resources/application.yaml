@@ -32,3 +32,13 @@ management:
   endpoint:
     health:
       show-details: never
+
+portal:
+  security:
+    jwt:
+      secret-base64: ${JWT_SECRET_BASE64}
+      issuer: portal-solicitacoes
+      audience: portal-solicitacoes-api
+    access-token-validade: 15m
+    sessao-validade: 8h
+    cookie-secure: ${AUTH_COOKIE_SECURE:false}

@@ -34,7 +34,8 @@ As tabelas de solicitações e sessões já existem,
 mas suas funcionalidades ainda não estão disponíveis.
 
 A CI das etapas anteriores foi validada.
-A execução da CI da branch de cadastro está pendente.
+- CI do PR de cadastro: concluída com sucesso, conforme resultado
+  informado pelo desenvolvedor.
 
 ## Tecnologias utilizadas
 

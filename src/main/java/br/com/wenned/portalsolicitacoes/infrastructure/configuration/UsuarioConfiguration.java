@@ -4,6 +4,7 @@ import br.com.wenned.portalsolicitacoes.application.port.out.security.PasswordHa
 import br.com.wenned.portalsolicitacoes.application.port.out.usuarios.UsuarioRepository;
 import br.com.wenned.portalsolicitacoes.application.usecase.usuarios.CadastrarUsuarioUseCase;
 import br.com.wenned.portalsolicitacoes.infrastructure.security.BCryptPasswordHasher;
+import br.com.wenned.portalsolicitacoes.application.usecase.usuarios.ConsultarUsuarioAutenticadoUseCase;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -37,5 +38,12 @@ public class UsuarioConfiguration {
         Clock clock
     ) {
         return new CadastrarUsuarioUseCase(repository, hasher, clock);
+    }
+
+    @Bean
+    public ConsultarUsuarioAutenticadoUseCase consultarUsuarioAutenticadoUseCase(
+            UsuarioRepository repository
+    ) {
+        return new ConsultarUsuarioAutenticadoUseCase(repository);
     }
 }
