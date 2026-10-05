@@ -1,8 +1,8 @@
 package br.com.wenned.portalsolicitacoes.presentation.exception;
 
-import br.com.wenned.portalsolicitacoes.domain.exception.usuarios.EmailJaCadastradoException;
 import br.com.wenned.portalsolicitacoes.domain.exception.autenticacao.AutenticacaoInvalidaException;
-
+import br.com.wenned.portalsolicitacoes.domain.exception.solicitacoes.SolicitacaoNaoEncontradaException;
+import br.com.wenned.portalsolicitacoes.domain.exception.usuarios.EmailJaCadastradoException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,6 +12,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.time.Instant;
 import java.util.List;
@@ -59,6 +60,23 @@ public class ApiExceptionHandler {
         );
     }
 
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiError> invalidParameter(
+        MethodArgumentTypeMismatchException exception,
+        HttpServletRequest request
+    ) {
+        return response(
+            HttpStatus.BAD_REQUEST,
+            "INVALID_PARAMETER",
+            "Um parâmetro da requisição possui formato inválido.",
+            request,
+            List.of(new FieldError(
+                exception.getName(),
+                "Formato inválido."
+            ))
+        );
+    }
+
     @ExceptionHandler(EmailJaCadastradoException.class)
     public ResponseEntity<ApiError> duplicateEmail(
         EmailJaCadastradoException exception,
@@ -67,6 +85,20 @@ public class ApiExceptionHandler {
         return response(
             HttpStatus.CONFLICT,
             "EMAIL_ALREADY_REGISTERED",
+            exception.getMessage(),
+            request,
+            List.of()
+        );
+    }
+
+    @ExceptionHandler(SolicitacaoNaoEncontradaException.class)
+    public ResponseEntity<ApiError> requestNotFound(
+        SolicitacaoNaoEncontradaException exception,
+        HttpServletRequest request
+    ) {
+        return response(
+            HttpStatus.NOT_FOUND,
+            "REQUEST_NOT_FOUND",
             exception.getMessage(),
             request,
             List.of()
@@ -87,12 +119,25 @@ public class ApiExceptionHandler {
         );
     }
 
+    @ExceptionHandler(AutenticacaoInvalidaException.class)
+    public ResponseEntity<ApiError> authentication(
+        AutenticacaoInvalidaException exception,
+        HttpServletRequest request
+    ) {
+        return response(
+            HttpStatus.UNAUTHORIZED,
+            "AUTHENTICATION_FAILED",
+            exception.getMessage(),
+            request,
+            List.of()
+        );
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> unexpected(
         Exception exception,
         HttpServletRequest request
     ) {
-        // Evita registrar dados de entrada e valores de SQL.
         LOGGER.error(
             "Erro inesperado em {}: {}",
             request.getRequestURI(),
@@ -103,20 +148,6 @@ public class ApiExceptionHandler {
             HttpStatus.INTERNAL_SERVER_ERROR,
             "INTERNAL_ERROR",
             "Não foi possível concluir a operação.",
-            request,
-            List.of()
-        );
-    }
-
-    @ExceptionHandler(AutenticacaoInvalidaException.class)
-    public ResponseEntity<ApiError> authentication(
-        AutenticacaoInvalidaException exception,
-        HttpServletRequest request
-    ) {
-        return response(
-            HttpStatus.UNAUTHORIZED,
-            "AUTHENTICATION_FAILED",
-            exception.getMessage(),
             request,
             List.of()
         );
@@ -146,7 +177,9 @@ public class ApiExceptionHandler {
         String path,
         Instant timestamp,
         List<FieldError> fieldErrors
-    ) {}
+    ) {
+    }
 
-    public record FieldError(String field, String message) {}
+    public record FieldError(String field, String message) {
+    }
 }
