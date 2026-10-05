@@ -270,6 +270,7 @@ ajuste as variáveis correspondentes.
 | PUT | /api/v1/solicitacoes/{id} | Edição somente em ABERTO | Bearer JWT e propriedade |
 | DELETE | /api/v1/solicitacoes/{id} | Exclusão física somente em ABERTO | Bearer JWT e propriedade |
 | PATCH | /api/v1/solicitacoes/{id}/status | Avanço de status | Bearer JWT e propriedade |
+| GET | /api/v1/dashboard | Totais e contagens por status | Bearer JWT e propriedade |
 
 ## Cadastro de usuário
 
@@ -531,6 +532,31 @@ O controle protege o intervalo entre leitura e escrita no backend.
 Não há detecção específica de formulários antigos no cliente:
 a versão esperada é consultada pelo backend durante a operação.
 
+## Dashboard
+
+GET /api/v1/dashboard
+
+Exige Bearer JWT e considera somente as solicitações
+do usuário autenticado.
+
+Resposta:
+
+{
+  "total": 0,
+  "abertas": 0,
+  "emAtendimento": 0,
+  "concluidas": 0
+}
+
+Os indicadores consideram todas as solicitações do usuário,
+independentemente dos filtros da listagem.
+
+Usuário sem solicitações recebe valores zero.
+A resposta utiliza Cache-Control: no-store.
+
+As contagens são calculadas em uma única consulta ao PostgreSQL,
+sem carregar as solicitações em memória.
+
 ## Testes
 
 Com o Docker acessível:
@@ -629,6 +655,8 @@ será registrado após sua execução.
 - [Registro de LLM: criação](docs/llm/criacao-solicitacoes.md)
 - [Registro de LLM: consultas](docs/llm/consulta-solicitacoes.md)
 - [Registro de LLM: operações](docs/llm/operacoes-solicitacoes.md)
+- [Arquitetura do dashboard](docs/architecture/dashboard-usuario.md)
+- [Registro de LLM: dashboard](docs/llm/dashboard-usuario.md)
 
 O Memorial Técnico de Desenvolvimento será consolidado
 ao longo das próximas etapas.
