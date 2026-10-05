@@ -18,9 +18,11 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 import java.net.CookieManager;
 import java.net.CookiePolicy;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -71,10 +73,7 @@ class ListarSolicitacoesHttpIntegrationTest {
         );
 
         inserirSolicitacao(
-            outroUsuario.id(),
-            "TI",
-            "ABERTO",
-            DATA_BASE.plusSeconds(3)
+            outroUsuario.id(), "TI", "ABERTO", DATA_BASE.plusSeconds(3)
         );
 
         var primeira = listar(usuario, "?page=0&size=2");
@@ -84,21 +83,17 @@ class ListarSolicitacoesHttpIntegrationTest {
             .containsExactly(recente.toString(), intermediaria.toString());
 
         List<String> proprietarios = JsonPath.read(
-            primeira.body(),
-            "$.content[*].solicitanteId"
+            primeira.body(), "$.content[*].solicitanteId"
         );
 
-        assertThat(proprietarios)
-            .containsOnly(usuario.id().toString());
+        assertThat(proprietarios).containsOnly(usuario.id().toString());
 
         var segunda = listar(usuario, "?page=1&size=2");
         verificarPagina(segunda, 1, 2, 3, 2);
-
         assertThat(ids(segunda)).containsExactly(antiga.toString());
 
         var foraDoIntervalo = listar(usuario, "?page=2&size=2");
         verificarPagina(foraDoIntervalo, 2, 2, 3, 2);
-
         assertThat(ids(foraDoIntervalo)).isEmpty();
     }
 
@@ -116,7 +111,6 @@ class ListarSolicitacoesHttpIntegrationTest {
         var response = listar(usuario, "");
 
         verificarPagina(response, 0, 20, 2, 1);
-
         assertThat(ids(response))
             .containsExactly(segunda.toString(), primeira.toString());
     }
@@ -140,21 +134,16 @@ class ListarSolicitacoesHttpIntegrationTest {
         );
 
         inserirSolicitacao(
-            outroUsuario.id(),
-            "TI",
-            "ABERTO",
-            DATA_BASE.plusSeconds(4)
+            outroUsuario.id(), "TI", "ABERTO", DATA_BASE.plusSeconds(4)
         );
 
         var porStatus = listar(usuario, "?status=ABERTO");
         verificarPagina(porStatus, 0, 20, 2, 1);
-
         assertThat(ids(porStatus))
             .containsExactly(rhAberta.toString(), tiAberta.toString());
 
         var porCategoria = listar(usuario, "?categoria=TI");
         verificarPagina(porCategoria, 0, 20, 3, 1);
-
         assertThat(ids(porCategoria)).containsExactly(
             tiConcluida.toString(),
             tiEmAtendimento.toString(),
@@ -163,14 +152,11 @@ class ListarSolicitacoesHttpIntegrationTest {
 
         var combinados = listar(usuario, "?status=ABERTO&categoria=TI");
         verificarPagina(combinados, 0, 20, 1, 1);
-
         assertThat(ids(combinados)).containsExactly(tiAberta.toString());
 
         var semCorrespondencia = listar(
-            usuario,
-            "?status=CONCLUIDO&categoria=RH"
+            usuario, "?status=CONCLUIDO&categoria=RH"
         );
-
         verificarPagina(semCorrespondencia, 0, 20, 0, 0);
         assertThat(ids(semCorrespondencia)).isEmpty();
     }
@@ -207,15 +193,178 @@ class ListarSolicitacoesHttpIntegrationTest {
     @Test
     void deveRecusarListagemSemAutenticacao() throws Exception {
         var response = enviar(
-            novoCliente(),
-            "GET",
-            "/solicitacoes",
-            null,
-            null,
-            null
+            novoCliente(), "GET", "/solicitacoes", null, null, null
         );
 
         assertThat(response.statusCode()).isEqualTo(401);
+    }
+
+    @Test
+    void deveBuscarTituloParcialIgnorandoCaixaEEspacosExternos()
+        throws Exception {
+
+        var usuario = cadastrarEAutenticar();
+
+        UUID esperado = inserirSolicitacao(
+            usuario.id(), "TI", "ABERTO", DATA_BASE,
+            "Troca de COMPUTADOR"
+        );
+
+        inserirSolicitacao(
+            usuario.id(), "TI", "ABERTO", DATA_BASE.plusSeconds(1),
+            "Troca de monitor"
+        );
+
+        var response = listar(
+            usuario, "?titulo=" + codificar("  computador  ")
+        );
+
+        verificarPagina(response, 0, 20, 1, 1);
+        assertThat(ids(response)).containsExactly(esperado.toString());
+
+        var tituloVazio = listar(
+            usuario, "?titulo=" + codificar("   ")
+        );
+
+        verificarPagina(tituloVazio, 0, 20, 2, 1);
+    }
+
+    @Test
+    void deveTratarPercentualESublinhadoComoTextoLiteral() throws Exception {
+        var usuario = cadastrarEAutenticar();
+
+        UUID esperado = inserirSolicitacao(
+            usuario.id(), "TI", "ABERTO", DATA_BASE,
+            "Ajustar relatório 50%_final"
+        );
+
+        inserirSolicitacao(
+            usuario.id(), "TI", "ABERTO", DATA_BASE.plusSeconds(1),
+            "Ajustar relatório 50XYZfinal"
+        );
+
+        var response = listar(
+            usuario, "?titulo=" + codificar("50%_final")
+        );
+
+        verificarPagina(response, 0, 20, 1, 1);
+        assertThat(ids(response)).containsExactly(esperado.toString());
+    }
+
+    @Test
+    void deveAplicarLimitesDoDiaNoFusoSaoPaulo() throws Exception {
+        var usuario = cadastrarEAutenticar();
+
+        // Em outubro de 2026, o dia local começa às 03:00 UTC.
+        Instant inicio = Instant.parse("2026-10-05T03:00:00Z");
+        Instant diaSeguinte = Instant.parse("2026-10-06T03:00:00Z");
+
+        UUID antes = inserirSolicitacao(
+            usuario.id(), "TI", "ABERTO", inicio.minusSeconds(1)
+        );
+        UUID noInicio = inserirSolicitacao(
+            usuario.id(), "TI", "ABERTO", inicio
+        );
+        UUID noFinal = inserirSolicitacao(
+            usuario.id(), "TI", "ABERTO", diaSeguinte.minusSeconds(1)
+        );
+        UUID depois = inserirSolicitacao(
+            usuario.id(), "TI", "ABERTO", diaSeguinte
+        );
+
+        var periodoCompleto = listar(
+            usuario, "?dataInicial=2026-10-05&dataFinal=2026-10-05"
+        );
+
+        verificarPagina(periodoCompleto, 0, 20, 2, 1);
+        assertThat(ids(periodoCompleto)).containsExactly(
+            noFinal.toString(), noInicio.toString()
+        );
+
+        var somenteInicio = listar(
+            usuario, "?dataInicial=2026-10-05"
+        );
+
+        verificarPagina(somenteInicio, 0, 20, 3, 1);
+        assertThat(ids(somenteInicio)).containsExactly(
+            depois.toString(), noFinal.toString(), noInicio.toString()
+        );
+
+        var somenteFinal = listar(
+            usuario, "?dataFinal=2026-10-05"
+        );
+
+        verificarPagina(somenteFinal, 0, 20, 3, 1);
+        assertThat(ids(somenteFinal)).containsExactly(
+            noFinal.toString(), noInicio.toString(), antes.toString()
+        );
+    }
+
+    @Test
+    void deveCombinarTodosOsFiltrosSemExporOutroProprietario()
+        throws Exception {
+
+        var usuario = cadastrarEAutenticar();
+        var outroUsuario = cadastrarEAutenticar();
+
+        UUID esperado = inserirSolicitacao(
+            usuario.id(), "TI", "ABERTO", DATA_BASE,
+            "Troca de computador"
+        );
+
+        inserirSolicitacao(
+            outroUsuario.id(), "TI", "ABERTO", DATA_BASE,
+            "Troca de computador"
+        );
+        inserirSolicitacao(
+            usuario.id(), "RH", "ABERTO", DATA_BASE,
+            "Troca de computador"
+        );
+        inserirSolicitacao(
+            usuario.id(), "TI", "CONCLUIDO", DATA_BASE,
+            "Troca de computador"
+        );
+        inserirSolicitacao(
+            usuario.id(), "TI", "ABERTO", DATA_BASE,
+            "Troca de monitor"
+        );
+        inserirSolicitacao(
+            usuario.id(), "TI", "ABERTO",
+            Instant.parse("2026-10-04T06:00:00Z"),
+            "Troca de computador"
+        );
+
+        var response = listar(
+            usuario,
+            "?titulo=computador&categoria=TI&status=ABERTO"
+                + "&dataInicial=2026-10-05&dataFinal=2026-10-05"
+                + "&page=0&size=1"
+        );
+
+        verificarPagina(response, 0, 1, 1, 1);
+        assertThat(ids(response)).containsExactly(esperado.toString());
+
+        List<String> proprietarios = JsonPath.read(
+            response.body(), "$.content[*].solicitanteId"
+        );
+
+        assertThat(proprietarios).containsOnly(usuario.id().toString());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+        "?dataInicial=2026-10-06&dataFinal=2026-10-05",
+        "?dataInicial=nao-e-data",
+        "?dataFinal=2026-13-01"
+    })
+    void deveRecusarPeriodoInvalido(String query) throws Exception {
+        var usuario = cadastrarEAutenticar();
+
+        var response = listar(usuario, query);
+
+        assertThat(response.statusCode())
+            .as("Resposta para %s: %s", query, response.body())
+            .isEqualTo(400);
     }
 
     private UUID inserirSolicitacao(
@@ -223,6 +372,18 @@ class ListarSolicitacoesHttpIntegrationTest {
         String categoria,
         String status,
         Instant data
+    ) {
+        return inserirSolicitacao(
+            usuarioId, categoria, status, data, "Solicitação de teste"
+        );
+    }
+
+    private UUID inserirSolicitacao(
+        UUID usuarioId,
+        String categoria,
+        String status,
+        Instant data,
+        String titulo
     ) {
         UUID id = UUID.randomUUID();
         OffsetDateTime timestamp = data.atOffset(ZoneOffset.UTC);
@@ -235,7 +396,7 @@ class ListarSolicitacoesHttpIntegrationTest {
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             id,
-            "Solicitação de teste",
+            titulo,
             "Descrição da solicitação de teste.",
             categoria,
             status,
@@ -275,8 +436,7 @@ class ListarSolicitacoesHttpIntegrationTest {
         Number actualPage = JsonPath.read(response.body(), "$.page");
         Number actualSize = JsonPath.read(response.body(), "$.size");
         Number actualTotal = JsonPath.read(
-            response.body(),
-            "$.totalElements"
+            response.body(), "$.totalElements"
         );
         Number actualPages = JsonPath.read(response.body(), "$.totalPages");
 
@@ -288,6 +448,10 @@ class ListarSolicitacoesHttpIntegrationTest {
 
     private List<String> ids(HttpResponse<String> response) {
         return JsonPath.read(response.body(), "$.content[*].id");
+    }
+
+    private static String codificar(String texto) {
+        return URLEncoder.encode(texto, StandardCharsets.UTF_8);
     }
 
     private UsuarioAutenticado cadastrarEAutenticar() throws Exception {
@@ -314,12 +478,7 @@ class ListarSolicitacoesHttpIntegrationTest {
         );
 
         var csrfResponse = enviar(
-            client,
-            "GET",
-            "/auth/csrf",
-            null,
-            null,
-            null
+            client, "GET", "/auth/csrf", null, null, null
         );
 
         assertThat(csrfResponse.statusCode()).isEqualTo(200);
