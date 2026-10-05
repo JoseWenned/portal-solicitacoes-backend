@@ -820,6 +820,8 @@ será registrado após sua execução.
 - [Registro de LLM: dashboard](docs/llm/dashboard-usuario.md)
 - [Registro de LLM: documentação da API](docs/llm/documentacao-api.md)
 - [Registro de LLM: revisão da integração](docs/llm/revisao-integracao-backend.md)
+- [Dicionário de dados](docs/database/dicionario-dados.md)
+- [Memorial Técnico de Desenvolvimento](docs/memorial-tecnico.md)
 
 O Memorial Técnico de Desenvolvimento reunirá as tecnologias utilizadas,
 suas justificativas, as decisões arquiteturais, o processo de desenvolvimento,
