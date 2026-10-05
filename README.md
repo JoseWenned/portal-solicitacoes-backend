@@ -29,6 +29,9 @@ Implementado e validado localmente:
 - Consulta do usuário autenticado.
 - Criação de solicitações vinculadas ao usuário autenticado.
 - Status inicial ABERTO e código numérico gerado pelo PostgreSQL.
+- Consulta individual limitada ao proprietário.
+- Listagem paginada limitada ao proprietário.
+- Filtros por status e categoria.
 - Tratamento de erros HTTP.
 - Testes unitários e de integração com Testcontainers.
 - Dockerfile e Docker Compose.
@@ -36,14 +39,13 @@ Implementado e validado localmente:
 
 Ainda não implementado:
 
-- Listagem e consulta individual de solicitações.
 - Edição, exclusão e alteração de status.
-- Filtros e dashboard.
+- Dashboard.
 - Documentação OpenAPI/Swagger.
-- Integração com o frontend.
+- Frontend e integração completa.
 
-A suíte local possui 90 testes aprovados.
-A CI da branch de criação de solicitações permanece pendente.
+A suíte local possui 106 testes aprovados.
+A CI da branch de consulta de solicitações permanece pendente.
 
 ## Tecnologias utilizadas
 
@@ -62,7 +64,7 @@ A CI da branch de criação de solicitações permanece pendente.
 O backend é organizado por camadas:
 
 - domain: entidades e regras de domínio.
-- application: casos de uso e portas.
+- application: casos de uso, portas e resultados.
 - infrastructure: persistência, mappers, segurança e configuração.
 - presentation: controllers, DTOs e tratamento de erros HTTP.
 
@@ -72,6 +74,9 @@ e conceito de negócio.
 Domínio e aplicação permanecem independentes de Spring e JPA.
 Os modelos de persistência são separados das entidades de domínio.
 As conversões são realizadas por mappers específicos.
+
+O contrato de paginação da aplicação não depende de Page ou Pageable
+do Spring Data.
 
 ## Pré-requisitos
 
@@ -109,11 +114,11 @@ O arquivo `.env` não deve ser versionado.
 | POSTGRES_DB | Nome do banco |
 | POSTGRES_USER | Usuário do banco |
 | POSTGRES_PASSWORD | Senha do banco |
-| JWT_SECRET_BASE64 | Chave de assinatura JWT em Base64, com pelo menos 32 bytes após decodificação |
-| AUTH_COOKIE_SECURE | Uso de cookies somente por HTTPS; false no ambiente HTTP local |
+| JWT_SECRET_BASE64 | Chave JWT em Base64, com pelo menos 32 bytes após decodificação |
+| AUTH_COOKIE_SECURE | Cookies somente por HTTPS; false no ambiente HTTP local |
 
 O Compose fornece ao backend `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`
-e a chave JWT.
+e a configuração de segurança.
 
 O Spring Boot não carrega o arquivo `.env` automaticamente.
 
@@ -254,9 +259,11 @@ ajuste as variáveis correspondentes.
 | GET | /api/v1/auth/csrf | Obtenção do token CSRF | Público |
 | POST | /api/v1/auth/login | Login | CSRF |
 | POST | /api/v1/auth/refresh | Renovação do acesso | CSRF e refresh cookie |
-| POST | /api/v1/auth/logout | Encerramento da sessão | CSRF; revoga a sessão quando identificada pelo cookie |
-| GET | /api/v1/usuarios/me | Consulta do usuário autenticado | Bearer JWT |
+| POST | /api/v1/auth/logout | Encerramento da sessão | CSRF; revoga a sessão identificada pelo cookie |
+| GET | /api/v1/usuarios/me | Usuário autenticado | Bearer JWT |
 | POST | /api/v1/solicitacoes | Criação de solicitação | Bearer JWT |
+| GET | /api/v1/solicitacoes/{id} | Consulta individual | Bearer JWT e propriedade |
+| GET | /api/v1/solicitacoes | Listagem paginada e filtros | Bearer JWT e propriedade |
 
 ## Cadastro de usuário
 
@@ -321,18 +328,13 @@ Obtenha novamente o token quando o contexto de autenticação
 alterar o cookie CSRF. Os testes HTTP realizam essa obtenção
 antes da renovação e do logout.
 
-No ambiente HTTP local, o refresh cookie utiliza:
+O refresh cookie utiliza HttpOnly, SameSite=Lax
+e Path=/api/v1/auth.
 
-- HttpOnly.
-- SameSite=Lax.
-- Path=/api/v1/auth.
-- Secure desativado.
-
+No ambiente HTTP local, Secure permanece desativado.
 Em HTTPS, habilite Secure por configuração.
 
 ## Criação de solicitações
-
-Endpoint:
 
 ```http
 POST /api/v1/solicitacoes
@@ -369,9 +371,62 @@ O corpo contém `id`, `codigo`, `titulo`, `descricao`, `categoria`,
 A versão de persistência não é exposta.
 O cliente não pode definir proprietário, status ou código.
 
-A política de rejeitar ou ignorar campos desconhecidos ainda
-não foi fixada explicitamente. Esses campos não controlam
-proprietário ou status.
+## Consulta individual
+
+```http
+GET /api/v1/solicitacoes/{id}
+Authorization: Bearer <access-token>
+```
+
+A busca combina identificador da solicitação e proprietário.
+
+Respostas:
+
+- 200: solicitação encontrada para o usuário autenticado.
+- 400: identificador com formato inválido.
+- 401: autenticação ausente ou inválida.
+- 404: solicitação inexistente ou pertencente a outro usuário.
+
+Solicitação inexistente e solicitação de outro usuário retornam
+o mesmo código e mensagem de erro.
+
+## Listagem e filtros
+
+```http
+GET /api/v1/solicitacoes?page=0&size=20&status=ABERTO&categoria=TI
+Authorization: Bearer <access-token>
+```
+
+| Parâmetro | Regra |
+|---|---|
+| page | Índice iniciado em zero; padrão 0 |
+| size | De 1 a 100; padrão 20 |
+| status | Opcional: ABERTO, EM_ATENDIMENTO ou CONCLUIDO |
+| categoria | Opcional: TI, RH, COMPRAS, FINANCEIRO ou INFRAESTRUTURA |
+
+Os filtros são combinados com AND.
+A ordenação é `createdAt DESC, codigo DESC`.
+
+Conteúdo e totais consideram somente as solicitações do usuário
+autenticado que correspondam aos filtros.
+
+Formato da resposta:
+
+```json
+{
+  "content": [],
+  "page": 0,
+  "size": 20,
+  "totalElements": 0,
+  "totalPages": 0
+}
+```
+
+Página além do intervalo retorna HTTP 200 com conteúdo vazio
+e totais preservados.
+
+Paginação inválida ou enum desconhecido retorna HTTP 400.
+Ausência de autenticação retorna HTTP 401.
 
 ## Testes
 
@@ -394,18 +449,23 @@ Para executar testes específicos:
 ./mvnw -Dtest=AutenticacaoHttpIntegrationTest test
 ./mvnw -Dtest=SolicitacaoRepositoryIntegrationTest test
 ./mvnw -Dtest=CriarSolicitacaoHttpIntegrationTest test
+./mvnw -Dtest=ConsultarSolicitacaoHttpIntegrationTest test
+./mvnw -Dtest=ListarSolicitacoesHttpIntegrationTest test
 ```
 
 ### Validação local mais recente
 
-- Suíte completa: 90 testes.
+- Suíte completa: 106 testes.
 - Nenhuma falha, erro ou teste ignorado.
 - Maven verify: BUILD SUCCESS.
 - Autenticação HTTP: cinco execuções aprovadas.
 - Criação de solicitações HTTP: dez execuções aprovadas.
+- Consulta individual HTTP: cinco testes aprovados.
+- Listagem HTTP: onze execuções aprovadas.
 - Persistência e recuperação do código gerado verificadas.
-- Revogação de sessão e rejeição dos JWTs após logout verificadas.
-- Rejeição de operações de autenticação sem CSRF verificada.
+- Revogação da sessão e rejeição dos JWTs após logout verificadas.
+- Isolamento da consulta, listagem e totais por proprietário verificado.
+- Paginação, ordenação e filtros individuais e combinados verificados.
 
 Resultados informados pelo desenvolvedor a partir da execução
 no Ubuntu/WSL.
@@ -423,18 +483,20 @@ na verificação Maven.
 Não há publicação automática de imagens nem deploy automático.
 
 A execução local não substitui a validação da CI.
-O resultado da CI da branch de criação de solicitações
+O resultado da CI da branch de consulta de solicitações
 será registrado após sua execução.
 
 ## Limitações atuais
 
-- Integração com o frontend ainda não realizada.
-- Operações de consulta, edição, exclusão e alteração de status pendentes.
-- Filtros, dashboard e OpenAPI pendentes.
+- Edição, exclusão e alteração de status pendentes.
+- Dashboard e OpenAPI pendentes.
+- Frontend e integração completa pendentes.
+- Ordenação fixa e ausência de busca textual.
 - Testes de persistência não simulam múltiplas threads concorrentes.
 - Coordenação entre renovação e logout concorrentes ainda pendente.
 - Política explícita para campos JSON desconhecidos ainda pendente.
-- Respostas de erro da segurança e dos controllers ainda possuem
+- Campos desconhecidos não controlam proprietário ou status na criação.
+- Respostas de erro da segurança e dos controllers possuem
   diferenças de estrutura.
 
 ## Documentação
@@ -443,12 +505,14 @@ será registrado após sua execução.
 - [Persistência e migrations](docs/database/persistencia-migrations.md)
 - [Arquitetura do cadastro](docs/architecture/cadastro-usuario.md)
 - [Arquitetura da autenticação](docs/architecture/autenticacao-jwt.md)
-- [Arquitetura da criação de solicitações](docs/architecture/criacao-solicitacoes.md)
+- [Arquitetura da criação](docs/architecture/criacao-solicitacoes.md)
+- [Arquitetura das consultas](docs/architecture/consulta-solicitacoes.md)
 - [Registro de LLM: estrutura inicial](docs/llm/estrutura-inicial.md)
 - [Registro de LLM: persistência](docs/llm/persistencia-migrations.md)
 - [Registro de LLM: cadastro](docs/llm/cadastro-usuario.md)
 - [Registro de LLM: autenticação](docs/llm/autenticacao-jwt.md)
-- [Registro de LLM: criação de solicitações](docs/llm/criacao-solicitacoes.md)
+- [Registro de LLM: criação](docs/llm/criacao-solicitacoes.md)
+- [Registro de LLM: consultas](docs/llm/consulta-solicitacoes.md)
 
 O Memorial Técnico de Desenvolvimento será consolidado
 ao longo das próximas etapas.
