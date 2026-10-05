@@ -24,4 +24,17 @@ public interface SolicitacaoRepository {
         int page,
         int size
     );
+
+    boolean editar(Solicitacao solicitacao);
+
+    boolean alterarStatus(
+        Solicitacao solicitacao,
+        StatusSolicitacao statusAnterior
+    );
+
+    boolean excluir(
+        UUID id,
+        UUID solicitanteId,
+        long versaoEsperada
+    );
 }

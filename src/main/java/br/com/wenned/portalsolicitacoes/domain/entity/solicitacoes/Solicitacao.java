@@ -1,5 +1,7 @@
 package br.com.wenned.portalsolicitacoes.domain.entity.solicitacoes;
 
+import br.com.wenned.portalsolicitacoes.domain.exception.solicitacoes.OperacaoSolicitacaoInvalidaException;
+
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
@@ -118,6 +120,88 @@ public final class Solicitacao {
             updatedAt,
             version
         );
+    }
+
+    public Solicitacao editar(
+        String novoTitulo,
+        String novaDescricao,
+        CategoriaSolicitacao novaCategoria,
+        Instant agora
+    ) {
+        exigirAberta("editar");
+        validarDataOperacao(agora);
+
+        return new Solicitacao(
+            id,
+            codigo,
+            novoTitulo,
+            novaDescricao,
+            novaCategoria,
+            status,
+            solicitanteId,
+            createdAt,
+            agora,
+            version
+        );
+    }
+
+    public void validarExclusao() {
+        exigirAberta("excluir");
+    }
+
+    public Solicitacao alterarStatus(
+        StatusSolicitacao novoStatus,
+        Instant agora
+    ) {
+        if (novoStatus == null) {
+            throw new IllegalArgumentException("Novo status obrigatório.");
+        }
+
+        boolean transicaoPermitida =
+            (status == StatusSolicitacao.ABERTO
+                && novoStatus == StatusSolicitacao.EM_ATENDIMENTO)
+            || (status == StatusSolicitacao.EM_ATENDIMENTO
+                && novoStatus == StatusSolicitacao.CONCLUIDO);
+
+        if (!transicaoPermitida) {
+            throw new OperacaoSolicitacaoInvalidaException(
+                "Transição de status não permitida."
+            );
+        }
+
+        validarDataOperacao(agora);
+
+        return new Solicitacao(
+            id,
+            codigo,
+            titulo,
+            descricao,
+            categoria,
+            novoStatus,
+            solicitanteId,
+            createdAt,
+            agora,
+            version
+        );
+    }
+
+    private void exigirAberta(String operacao) {
+        if (status != StatusSolicitacao.ABERTO) {
+            throw new OperacaoSolicitacaoInvalidaException(
+                "Somente solicitações abertas podem ser alteradas pela operação de "
+                    + operacao + "."
+            );
+        }
+    }
+
+    private void validarDataOperacao(Instant agora) {
+        Objects.requireNonNull(agora, "Data da operação obrigatória.");
+
+        if (agora.isBefore(updatedAt)) {
+            throw new IllegalArgumentException(
+                "Data da operação não pode preceder a última atualização."
+            );
+        }
     }
 
     private static String validarTexto(

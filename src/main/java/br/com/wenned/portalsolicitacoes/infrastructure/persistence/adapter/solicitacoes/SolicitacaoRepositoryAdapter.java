@@ -120,4 +120,82 @@ public class SolicitacaoRepositoryAdapter implements SolicitacaoRepository {
             resultado.getTotalPages()
         );
     }
+
+    @Override
+    @Transactional
+    public boolean editar(Solicitacao solicitacao) {
+        Objects.requireNonNull(solicitacao);
+
+        if (solicitacao.getStatus() != StatusSolicitacao.ABERTO) {
+            throw new IllegalArgumentException(
+                "A persistência da edição exige status ABERTO."
+            );
+        }
+
+        return repositoryJPA.editarCondicionalmente(
+            solicitacao.getId(),
+            solicitacao.getSolicitanteId(),
+            solicitacao.getVersion(),
+            StatusSolicitacao.ABERTO,
+            solicitacao.getTitulo(),
+            solicitacao.getDescricao(),
+            solicitacao.getCategoria(),
+            solicitacao.getUpdatedAt()
+        ) == 1;
+    }
+
+    @Override
+    @Transactional
+    public boolean alterarStatus(
+        Solicitacao solicitacao,
+        StatusSolicitacao statusAnterior
+    ) {
+        Objects.requireNonNull(solicitacao);
+        Objects.requireNonNull(statusAnterior);
+
+        boolean transicaoPermitida =
+            (statusAnterior == StatusSolicitacao.ABERTO
+                && solicitacao.getStatus() == StatusSolicitacao.EM_ATENDIMENTO)
+            || (statusAnterior == StatusSolicitacao.EM_ATENDIMENTO
+                && solicitacao.getStatus() == StatusSolicitacao.CONCLUIDO);
+
+        if (!transicaoPermitida) {
+            throw new IllegalArgumentException(
+                "Transição inválida para persistência."
+            );
+        }
+
+        return repositoryJPA.alterarStatusCondicionalmente(
+            solicitacao.getId(),
+            solicitacao.getSolicitanteId(),
+            solicitacao.getVersion(),
+            statusAnterior,
+            solicitacao.getStatus(),
+            solicitacao.getUpdatedAt()
+        ) == 1;
+    }
+
+    @Override
+    @Transactional
+    public boolean excluir(
+        UUID id,
+        UUID solicitanteId,
+        long versaoEsperada
+    ) {
+        Objects.requireNonNull(id);
+        Objects.requireNonNull(solicitanteId);
+
+        if (versaoEsperada < 0) {
+            throw new IllegalArgumentException(
+                "Versão esperada não pode ser negativa."
+            );
+        }
+
+        return repositoryJPA.excluirCondicionalmente(
+            id,
+            solicitanteId,
+            versaoEsperada,
+            StatusSolicitacao.ABERTO
+        ) == 1;
+    }
 }
