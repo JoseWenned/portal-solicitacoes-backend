@@ -1727,16 +1727,12 @@ Os PRs das etapas foram concluídos.
 A aprovação dos PRs não substitui
 a confirmação dos resultados da CI.
 
-### Conferências de fechamento
+### Conferências de fechamento concluídas
 
-- Confirmar este memorial atualizado
-  na main do backend.
-- Conferir os READMEs
-  dos dois repositórios.
-- Confirmar os resultados finais da CI.
-- Conferir os links
-  e as instruções de entrega.
+- Memorial atualizado e disponível na main do backend.
+- READMEs dos dois repositórios conferidos.
+- Resultados finais da CI conferidos e aprovados.
+- Links e instruções de entrega conferidos.
 
-As evidências registradas descrevem
-resultados efetivamente informados
-pelo desenvolvedor.
+As conferências foram concluídas pelo desenvolvedor
+em 5 de outubro de 2026.
