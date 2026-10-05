@@ -32,6 +32,10 @@ Implementado e validado localmente:
 - Consulta individual limitada ao proprietário.
 - Listagem paginada limitada ao proprietário.
 - Filtros por status e categoria.
+- Edição de solicitações próprias somente em ABERTO.
+- Exclusão física de solicitações próprias somente em ABERTO.
+- Alteração de status no fluxo ABERTO → EM_ATENDIMENTO → CONCLUIDO.
+- Escritas condicionadas ao proprietário, versão e status esperado.
 - Tratamento de erros HTTP.
 - Testes unitários e de integração com Testcontainers.
 - Dockerfile e Docker Compose.
@@ -39,13 +43,12 @@ Implementado e validado localmente:
 
 Ainda não implementado:
 
-- Edição, exclusão e alteração de status.
 - Dashboard.
 - Documentação OpenAPI/Swagger.
 - Frontend e integração completa.
 
-A suíte local possui 106 testes aprovados.
-A CI da branch de consulta de solicitações permanece pendente.
+A suíte local possui 141 testes aprovados.
+A CI da branch de operações de solicitações permanece pendente.
 
 ## Tecnologias utilizadas
 
@@ -264,6 +267,9 @@ ajuste as variáveis correspondentes.
 | POST | /api/v1/solicitacoes | Criação de solicitação | Bearer JWT |
 | GET | /api/v1/solicitacoes/{id} | Consulta individual | Bearer JWT e propriedade |
 | GET | /api/v1/solicitacoes | Listagem paginada e filtros | Bearer JWT e propriedade |
+| PUT | /api/v1/solicitacoes/{id} | Edição somente em ABERTO | Bearer JWT e propriedade |
+| DELETE | /api/v1/solicitacoes/{id} | Exclusão física somente em ABERTO | Bearer JWT e propriedade |
+| PATCH | /api/v1/solicitacoes/{id}/status | Avanço de status | Bearer JWT e propriedade |
 
 ## Cadastro de usuário
 
@@ -428,6 +434,103 @@ e totais preservados.
 Paginação inválida ou enum desconhecido retorna HTTP 400.
 Ausência de autenticação retorna HTTP 401.
 
+## Edição de solicitações
+
+```http
+PUT /api/v1/solicitacoes/{id}
+Authorization: Bearer <access-token>
+Content-Type: application/json
+```
+
+Corpo:
+
+```json
+{
+  "titulo": "Título atualizado",
+  "descricao": "Descrição atualizada",
+  "categoria": "RH"
+}
+```
+
+A edição exige solicitação própria com status ABERTO.
+Título, descrição e categoria são obrigatórios.
+
+São preservados identificador, código, proprietário e data de criação.
+A data de atualização é alterada e a versão é incrementada.
+
+Sucesso: HTTP 204, sem corpo.
+
+## Exclusão de solicitações
+
+```http
+DELETE /api/v1/solicitacoes/{id}
+Authorization: Bearer <access-token>
+```
+
+A exclusão exige solicitação própria com status ABERTO.
+O registro é removido fisicamente.
+
+Sucesso: HTTP 204, sem corpo.
+Uma consulta posterior retorna HTTP 404.
+
+## Alteração de status
+
+```http
+PATCH /api/v1/solicitacoes/{id}/status
+Authorization: Bearer <access-token>
+Content-Type: application/json
+```
+
+Corpo:
+
+```json
+{
+  "status": "EM_ATENDIMENTO"
+}
+```
+
+Transições permitidas:
+
+```text
+ABERTO → EM_ATENDIMENTO → CONCLUIDO
+```
+
+Retornos, saltos de etapa e repetição do status atual são proibidos.
+
+A alteração exige propriedade, preserva os dados descritivos,
+atualiza `updatedAt` e incrementa a versão.
+
+Sucesso: HTTP 204, sem corpo.
+
+### Erros das operações
+
+- 400: dados ou parâmetros inválidos.
+- 401: autenticação ausente ou inválida.
+- 404: solicitação inexistente ou pertencente a outro usuário.
+- 409: estado incompatível ou conflito de escrita.
+
+Código do conflito: `REQUEST_STATE_CONFLICT`.
+
+Após uma alteração, o cliente pode consultar novamente a solicitação
+para obter seu estado atualizado.
+
+## Controle de concorrência das solicitações
+
+As escritas de edição, exclusão e alteração de status verificam:
+
+- Identificador.
+- Proprietário.
+- Versão esperada.
+- Status esperado.
+
+Atualizações incrementam a versão na mesma instrução de escrita.
+Não há atualização genérica por `save` nessas operações.
+
+O controle protege o intervalo entre leitura e escrita no backend.
+
+Não há detecção específica de formulários antigos no cliente:
+a versão esperada é consultada pelo backend durante a operação.
+
 ## Testes
 
 Com o Docker acessível:
@@ -451,21 +554,32 @@ Para executar testes específicos:
 ./mvnw -Dtest=CriarSolicitacaoHttpIntegrationTest test
 ./mvnw -Dtest=ConsultarSolicitacaoHttpIntegrationTest test
 ./mvnw -Dtest=ListarSolicitacoesHttpIntegrationTest test
+./mvnw -Dtest=SolicitacaoOperacoesTest test
+./mvnw -Dtest=OperacoesSolicitacaoHttpIntegrationTest test
+./mvnw -Dtest=SolicitacaoOperacoesRepositoryIntegrationTest test
 ```
 
 ### Validação local mais recente
 
-- Suíte completa: 106 testes.
+- Suíte completa: 141 testes.
 - Nenhuma falha, erro ou teste ignorado.
 - Maven verify: BUILD SUCCESS.
 - Autenticação HTTP: cinco execuções aprovadas.
 - Criação de solicitações HTTP: dez execuções aprovadas.
 - Consulta individual HTTP: cinco testes aprovados.
 - Listagem HTTP: onze execuções aprovadas.
+- Operações de solicitações HTTP: quatorze execuções aprovadas.
+- Condições de escrita: três testes de persistência aprovados.
 - Persistência e recuperação do código gerado verificadas.
 - Revogação da sessão e rejeição dos JWTs após logout verificadas.
 - Isolamento da consulta, listagem e totais por proprietário verificado.
 - Paginação, ordenação e filtros individuais e combinados verificados.
+- Edição, exclusão física e transições de status verificadas.
+- Escritas com versão antiga, status incompatível e proprietário
+  incorreto recusadas sem alteração indevida do registro.
+
+Os testes das condições de escrita utilizam expectativas
+desatualizadas sequencialmente, sem múltiplas threads concorrentes.
 
 Resultados informados pelo desenvolvedor a partir da execução
 no Ubuntu/WSL.
@@ -483,16 +597,16 @@ na verificação Maven.
 Não há publicação automática de imagens nem deploy automático.
 
 A execução local não substitui a validação da CI.
-O resultado da CI da branch de consulta de solicitações
+O resultado da CI da branch de operações de solicitações
 será registrado após sua execução.
 
 ## Limitações atuais
 
-- Edição, exclusão e alteração de status pendentes.
 - Dashboard e OpenAPI pendentes.
 - Frontend e integração completa pendentes.
 - Ordenação fixa e ausência de busca textual.
 - Testes de persistência não simulam múltiplas threads concorrentes.
+- Não há detecção específica de formulários antigos no cliente.
 - Coordenação entre renovação e logout concorrentes ainda pendente.
 - Política explícita para campos JSON desconhecidos ainda pendente.
 - Campos desconhecidos não controlam proprietário ou status na criação.
@@ -507,12 +621,14 @@ será registrado após sua execução.
 - [Arquitetura da autenticação](docs/architecture/autenticacao-jwt.md)
 - [Arquitetura da criação](docs/architecture/criacao-solicitacoes.md)
 - [Arquitetura das consultas](docs/architecture/consulta-solicitacoes.md)
+- [Arquitetura das operações](docs/architecture/operacoes-solicitacoes.md)
 - [Registro de LLM: estrutura inicial](docs/llm/estrutura-inicial.md)
 - [Registro de LLM: persistência](docs/llm/persistencia-migrations.md)
 - [Registro de LLM: cadastro](docs/llm/cadastro-usuario.md)
 - [Registro de LLM: autenticação](docs/llm/autenticacao-jwt.md)
 - [Registro de LLM: criação](docs/llm/criacao-solicitacoes.md)
 - [Registro de LLM: consultas](docs/llm/consulta-solicitacoes.md)
+- [Registro de LLM: operações](docs/llm/operacoes-solicitacoes.md)
 
 O Memorial Técnico de Desenvolvimento será consolidado
 ao longo das próximas etapas.

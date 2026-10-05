@@ -1,6 +1,7 @@
 package br.com.wenned.portalsolicitacoes.presentation.exception;
 
 import br.com.wenned.portalsolicitacoes.domain.exception.autenticacao.AutenticacaoInvalidaException;
+import br.com.wenned.portalsolicitacoes.domain.exception.solicitacoes.OperacaoSolicitacaoInvalidaException;
 import br.com.wenned.portalsolicitacoes.domain.exception.solicitacoes.SolicitacaoNaoEncontradaException;
 import br.com.wenned.portalsolicitacoes.domain.exception.usuarios.EmailJaCadastradoException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -99,6 +100,20 @@ public class ApiExceptionHandler {
         return response(
             HttpStatus.NOT_FOUND,
             "REQUEST_NOT_FOUND",
+            exception.getMessage(),
+            request,
+            List.of()
+        );
+    }
+
+    @ExceptionHandler(OperacaoSolicitacaoInvalidaException.class)
+    public ResponseEntity<ApiError> requestConflict(
+        OperacaoSolicitacaoInvalidaException exception,
+        HttpServletRequest request
+    ) {
+        return response(
+            HttpStatus.CONFLICT,
+            "REQUEST_STATE_CONFLICT",
             exception.getMessage(),
             request,
             List.of()
