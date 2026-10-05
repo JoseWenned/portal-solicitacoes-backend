@@ -18,24 +18,32 @@ Implementado e validado localmente:
 - Migrations Flyway para usuários, solicitações e sessões de autenticação.
 - Cadastro de usuário com validação e e-mail único.
 - Armazenamento de senha com hash BCrypt.
-- Tratamento padronizado dos erros do cadastro.
+- Login por e-mail e senha.
+- Access token JWT com validade máxima de 15 minutos.
+- Refresh token aleatório em cookie HttpOnly.
+- Sessões revogáveis com validade absoluta de oito horas.
+- Rotação do refresh token sem extensão da validade da sessão.
+- Logout com revogação da sessão.
+- Validação da sessão associada ao JWT nos acessos protegidos.
+- Proteção CSRF nos endpoints de login, renovação e logout.
+- Consulta do usuário autenticado.
+- Criação de solicitações vinculadas ao usuário autenticado.
+- Status inicial ABERTO e código numérico gerado pelo PostgreSQL.
+- Tratamento de erros HTTP.
 - Testes unitários e de integração com Testcontainers.
 - Dockerfile e Docker Compose.
 - Workflow de CI para verificação Maven e build Docker.
 
 Ainda não implementado:
 
-- Login, JWT, refresh token e logout.
-- Funcionalidades de solicitações.
+- Listagem e consulta individual de solicitações.
+- Edição, exclusão e alteração de status.
 - Filtros e dashboard.
 - Documentação OpenAPI/Swagger.
+- Integração com o frontend.
 
-As tabelas de solicitações e sessões já existem,
-mas suas funcionalidades ainda não estão disponíveis.
-
-A CI das etapas anteriores foi validada.
-- CI do PR de cadastro: concluída com sucesso, conforme resultado
-  informado pelo desenvolvedor.
+A suíte local possui 90 testes aprovados.
+A CI da branch de criação de solicitações permanece pendente.
 
 ## Tecnologias utilizadas
 
@@ -44,7 +52,8 @@ A CI das etapas anteriores foi validada.
 - Spring Web MVC, Bean Validation e Actuator.
 - Spring Data JPA e Hibernate.
 - PostgreSQL 16 e Flyway.
-- Spring Security Crypto com BCrypt.
+- Spring Security e OAuth2 Resource Server para validação JWT.
+- BCrypt para proteção de senhas.
 - JUnit, Mockito e Testcontainers.
 - Docker, Docker Compose e GitHub Actions.
 
@@ -54,13 +63,15 @@ O backend é organizado por camadas:
 
 - domain: entidades e regras de domínio.
 - application: casos de uso e portas.
-- infrastructure: persistência, mapeamento, hash e configuração.
+- infrastructure: persistência, mappers, segurança e configuração.
 - presentation: controllers, DTOs e tratamento de erros HTTP.
 
 Dentro das camadas, os arquivos são agrupados por responsabilidade
 e conceito de negócio.
 
 Domínio e aplicação permanecem independentes de Spring e JPA.
+Os modelos de persistência são separados das entidades de domínio.
+As conversões são realizadas por mappers específicos.
 
 ## Pré-requisitos
 
@@ -68,6 +79,7 @@ Para executar pelo Docker Compose:
 
 - Docker com daemon acessível.
 - Docker Compose.
+- Python 3 para gerar a chave JWT pelo exemplo abaixo.
 
 Para executar o Java diretamente no Ubuntu/WSL:
 
@@ -79,52 +91,104 @@ Não é necessária uma instalação global do Maven.
 
 ## Configuração
 
-Crie o arquivo local de configuração:
+Na raiz do repositório, crie o arquivo local de configuração:
 
 ```bash
 cp .env.example .env
 ```
 
-Se o arquivo .env já existir, preserve-o e confira seus valores.
+Se o arquivo `.env` já existir, preserve-o e confira seus valores.
 
 Configure uma senha local para o PostgreSQL.
-O arquivo .env não deve ser versionado.
+O arquivo `.env` não deve ser versionado.
 
-| Variável do Compose | Finalidade |
+| Variável | Finalidade |
 |---|---|
 | BACKEND_PORT | Porta local do backend; padrão 8080 |
 | POSTGRES_PORT | Porta local do banco; padrão 5434 |
 | POSTGRES_DB | Nome do banco |
 | POSTGRES_USER | Usuário do banco |
 | POSTGRES_PASSWORD | Senha do banco |
+| JWT_SECRET_BASE64 | Chave de assinatura JWT em Base64, com pelo menos 32 bytes após decodificação |
+| AUTH_COOKIE_SECURE | Uso de cookies somente por HTTPS; false no ambiente HTTP local |
 
-A aplicação recebe DB_URL, DB_USERNAME e DB_PASSWORD.
-O Compose fornece essas variáveis ao backend.
+O Compose fornece ao backend `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`
+e a chave JWT.
 
-O Spring Boot não carrega o arquivo .env automaticamente.
+O Spring Boot não carrega o arquivo `.env` automaticamente.
+
+### Geração da chave JWT
+
+Execute na raiz do repositório. O script preserva uma chave existente
+e preenche a configuração quando estiver ausente ou vazia,
+sem exibir o segredo:
+
+```bash
+python3 - <<'PY'
+from pathlib import Path
+import base64
+import secrets
+
+path = Path(".env")
+
+if not path.is_file():
+    raise SystemExit("Arquivo .env não encontrado na pasta atual.")
+
+lines = path.read_text(encoding="utf-8").splitlines()
+indexes = [
+    index
+    for index, line in enumerate(lines)
+    if line.strip().startswith("JWT_SECRET_BASE64=")
+]
+
+if len(indexes) > 1:
+    raise SystemExit("Há entradas duplicadas de JWT_SECRET_BASE64. Corrija o arquivo.")
+
+if indexes and lines[indexes[0]].split("=", 1)[1].strip():
+    print("JWT_SECRET_BASE64 já possui um valor. Chave preservada.")
+else:
+    value = base64.b64encode(secrets.token_bytes(32)).decode("ascii")
+    entry = f"JWT_SECRET_BASE64={value}"
+
+    if indexes:
+        lines[indexes[0]] = entry
+    else:
+        lines.append(entry)
+
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print("Chave JWT configurada sem exibir seu valor.")
+PY
+```
+
+Em ambientes HTTPS, configure `AUTH_COOKIE_SECURE=true`.
 
 ## Execução com Docker Compose
 
+Confira a configuração e inicie os serviços:
+
 ```bash
+docker compose config --quiet
 docker compose up --build -d
 docker compose ps
 ```
 
-O backend conecta-se a database:5432 na rede interna.
-O banco fica acessível localmente em 127.0.0.1:5434 por padrão.
+O backend conecta-se a `database:5432` na rede interna.
+O banco fica acessível localmente em `127.0.0.1:5434` por padrão.
 
 O Flyway aplica as migrations na inicialização.
-O Hibernate está configurado com ddl-auto=validate.
+O Hibernate utiliza `ddl-auto=validate`.
 
 Verifique a saúde:
 
 ```bash
-curl --fail http://localhost:8080/actuator/health
+curl --fail --retry 10 --retry-all-errors --retry-delay 2 \
+  http://localhost:8080/actuator/health
 ```
 
-Resultado esperado: status UP.
+Resultado esperado: `status` igual a `UP`.
 
-Se BACKEND_PORT foi alterada, ajuste a URL.
+Durante a inicialização, a conexão pode falhar temporariamente.
+Se `BACKEND_PORT` foi alterada, ajuste a URL.
 
 Para consultar logs:
 
@@ -153,15 +217,22 @@ pare-o antes de iniciar o Java localmente:
 docker compose stop backend
 ```
 
-Exporte as variáveis usando os mesmos valores configurados no .env.
-O exemplo abaixo considera banco e usuário com os nomes padrão:
+Exporte as variáveis usando os mesmos valores configurados no `.env`.
+O exemplo considera banco e usuário com os nomes padrão:
 
 ```bash
 export DB_URL='jdbc:postgresql://localhost:5434/portal_solicitacoes'
 export DB_USERNAME='portal_app'
+
 read -r -s -p 'Senha do banco: ' DB_PASSWORD
 echo
 export DB_PASSWORD
+
+read -r -s -p 'Chave JWT em Base64: ' JWT_SECRET_BASE64
+echo
+export JWT_SECRET_BASE64
+
+export AUTH_COOKIE_SECURE=false
 ```
 
 Execute:
@@ -174,13 +245,20 @@ chmod +x mvnw
 Se você alterou a porta, o nome do banco ou o usuário,
 ajuste as variáveis correspondentes.
 
+## Endpoints disponíveis
+
+| Método | Endpoint | Finalidade | Proteção |
+|---|---|---|---|
+| GET | /actuator/health | Saúde da aplicação | Público |
+| POST | /api/v1/usuarios | Cadastro de usuário | Público |
+| GET | /api/v1/auth/csrf | Obtenção do token CSRF | Público |
+| POST | /api/v1/auth/login | Login | CSRF |
+| POST | /api/v1/auth/refresh | Renovação do acesso | CSRF e refresh cookie |
+| POST | /api/v1/auth/logout | Encerramento da sessão | CSRF; revoga a sessão quando identificada pelo cookie |
+| GET | /api/v1/usuarios/me | Consulta do usuário autenticado | Bearer JWT |
+| POST | /api/v1/solicitacoes | Criação de solicitação | Bearer JWT |
+
 ## Cadastro de usuário
-
-Endpoint:
-
-```http
-POST /api/v1/usuarios
-```
 
 Exemplo com credenciais exclusivamente de teste:
 
@@ -197,18 +275,103 @@ Respostas:
 - 409: e-mail já cadastrado.
 - 500: erro inesperado.
 
-A resposta contém id, name, email e createdAt.
+A resposta contém `id`, `name`, `email` e `createdAt`.
 Senha e hash não são retornados.
 
 O cadastro não autentica automaticamente o usuário.
-Login ainda não está disponível.
 
 ### Regras de cadastro
 
-- Nome: de 3 a 100 caracteres Unicode após remover espaços externos.
+- Nome: de 3 a 100 pontos de código Unicode após remover espaços externos.
 - E-mail: válido, normalizado para minúsculas e único.
-- Senha: mínimo de 8 caracteres Unicode e máximo de 72 bytes em UTF-8.
-- Senha armazenada com BCrypt, custo 12.
+- Senha: mínimo de 8 pontos de código Unicode e máximo de 72 bytes em UTF-8.
+- Senha sem remoção de espaços ou normalização.
+- Hash BCrypt com custo 12.
+
+## Autenticação
+
+O login retorna um access token JWT e envia o refresh token
+somente por cookie HttpOnly.
+
+O access token possui validade máxima de 15 minutos,
+limitada pela expiração da sessão.
+
+A sessão possui validade absoluta de oito horas.
+A renovação substitui o refresh token sem estender esse prazo.
+
+Somente o hash SHA-256 do refresh token é armazenado no banco.
+O JWT é assinado com HS256.
+
+Cada acesso protegido verifica também se a sessão associada
+está ativa e pertence ao usuário identificado pelo JWT.
+
+O logout revoga a sessão, fazendo com que seus JWTs sejam rejeitados.
+
+### Proteção CSRF
+
+Antes de login, renovação ou logout:
+
+1. Consulte `GET /api/v1/auth/csrf`.
+2. Preserve os cookies recebidos.
+3. Envie o token retornado no header indicado por `headerName`.
+
+A resposta informa `X-CSRF-TOKEN` como nome do header.
+
+Obtenha novamente o token quando o contexto de autenticação
+alterar o cookie CSRF. Os testes HTTP realizam essa obtenção
+antes da renovação e do logout.
+
+No ambiente HTTP local, o refresh cookie utiliza:
+
+- HttpOnly.
+- SameSite=Lax.
+- Path=/api/v1/auth.
+- Secure desativado.
+
+Em HTTPS, habilite Secure por configuração.
+
+## Criação de solicitações
+
+Endpoint:
+
+```http
+POST /api/v1/solicitacoes
+Authorization: Bearer <access-token>
+Content-Type: application/json
+```
+
+Corpo:
+
+```json
+{
+  "titulo": "Acesso ao sistema",
+  "descricao": "Preciso de acesso ao sistema interno.",
+  "categoria": "TI"
+}
+```
+
+Regras:
+
+- Título obrigatório, com até 150 pontos de código Unicode.
+- Descrição obrigatória, com até 5.000 pontos de código Unicode.
+- Espaços externos removidos do título e da descrição.
+- Categoria obrigatória: TI, RH, COMPRAS, FINANCEIRO ou INFRAESTRUTURA.
+- Proprietário obtido exclusivamente do JWT validado.
+- Status inicial sempre ABERTO.
+- UUID gerado pelo domínio.
+- Código numérico gerado pelo PostgreSQL.
+
+Resposta de sucesso: HTTP 201.
+
+O corpo contém `id`, `codigo`, `titulo`, `descricao`, `categoria`,
+`status`, `solicitanteId`, `createdAt` e `updatedAt`.
+
+A versão de persistência não é exposta.
+O cliente não pode definir proprietário, status ou código.
+
+A política de rejeitar ou ignorar campos desconhecidos ainda
+não foi fixada explicitamente. Esses campos não controlam
+proprietário ou status.
 
 ## Testes
 
@@ -221,18 +384,31 @@ Com o Docker acessível:
 Os testes de integração iniciam PostgreSQL temporário por Testcontainers.
 Não utilizam o banco do Docker Compose.
 
-Para executar apenas os testes de integração do cadastro:
+O perfil `test` utiliza uma chave JWT conhecida e exclusiva para testes.
+Essa chave não deve ser utilizada em outros ambientes.
+
+Para executar testes específicos:
 
 ```bash
 ./mvnw -Dtest=CadastroUsuarioIntegrationTest test
+./mvnw -Dtest=AutenticacaoHttpIntegrationTest test
+./mvnw -Dtest=SolicitacaoRepositoryIntegrationTest test
+./mvnw -Dtest=CriarSolicitacaoHttpIntegrationTest test
 ```
 
-### Validação local da etapa de cadastro
+### Validação local mais recente
 
-- Cadastro manual: HTTP 201.
-- Testes de integração do cadastro: 6 aprovados.
-- Suíte completa: 28 testes, sem falhas, erros ou ignorados.
+- Suíte completa: 90 testes.
+- Nenhuma falha, erro ou teste ignorado.
 - Maven verify: BUILD SUCCESS.
+- Autenticação HTTP: cinco execuções aprovadas.
+- Criação de solicitações HTTP: dez execuções aprovadas.
+- Persistência e recuperação do código gerado verificadas.
+- Revogação de sessão e rejeição dos JWTs após logout verificadas.
+- Rejeição de operações de autenticação sem CSRF verificada.
+
+Resultados informados pelo desenvolvedor a partir da execução
+no Ubuntu/WSL.
 
 ## Integração contínua
 
@@ -241,19 +417,38 @@ O GitHub Actions executa:
 1. Verificação Maven.
 2. Build da imagem Docker.
 
-O build Docker utiliza -DskipTests porque os testes são executados
-no job de verificação Maven.
+O build Docker utiliza `-DskipTests` porque os testes são executados
+na verificação Maven.
 
 Não há publicação automática de imagens nem deploy automático.
+
+A execução local não substitui a validação da CI.
+O resultado da CI da branch de criação de solicitações
+será registrado após sua execução.
+
+## Limitações atuais
+
+- Integração com o frontend ainda não realizada.
+- Operações de consulta, edição, exclusão e alteração de status pendentes.
+- Filtros, dashboard e OpenAPI pendentes.
+- Testes de persistência não simulam múltiplas threads concorrentes.
+- Coordenação entre renovação e logout concorrentes ainda pendente.
+- Política explícita para campos JSON desconhecidos ainda pendente.
+- Respostas de erro da segurança e dos controllers ainda possuem
+  diferenças de estrutura.
 
 ## Documentação
 
 - [Infraestrutura inicial](docs/devops/estrutura-inicial.md)
 - [Persistência e migrations](docs/database/persistencia-migrations.md)
 - [Arquitetura do cadastro](docs/architecture/cadastro-usuario.md)
+- [Arquitetura da autenticação](docs/architecture/autenticacao-jwt.md)
+- [Arquitetura da criação de solicitações](docs/architecture/criacao-solicitacoes.md)
 - [Registro de LLM: estrutura inicial](docs/llm/estrutura-inicial.md)
 - [Registro de LLM: persistência](docs/llm/persistencia-migrations.md)
 - [Registro de LLM: cadastro](docs/llm/cadastro-usuario.md)
+- [Registro de LLM: autenticação](docs/llm/autenticacao-jwt.md)
+- [Registro de LLM: criação de solicitações](docs/llm/criacao-solicitacoes.md)
 
 O Memorial Técnico de Desenvolvimento será consolidado
 ao longo das próximas etapas.
@@ -262,4 +457,4 @@ ao longo das próximas etapas.
 
 Repositório separado:
 
-https://github.com/JoseWenned/portal-solicitacoes-frontend
+[portal-solicitacoes-frontend](https://github.com/JoseWenned/portal-solicitacoes-frontend)
