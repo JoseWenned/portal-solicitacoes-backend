@@ -9,7 +9,9 @@ import br.com.wenned.portalsolicitacoes.domain.entity.solicitacoes.CategoriaSoli
 import br.com.wenned.portalsolicitacoes.domain.entity.solicitacoes.StatusSolicitacao;
 import br.com.wenned.portalsolicitacoes.presentation.dto.solicitacoes.CriarSolicitacaoRequestDTO;
 import br.com.wenned.portalsolicitacoes.presentation.dto.solicitacoes.SolicitacaoResponseDTO;
+
 import jakarta.validation.Valid;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -22,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
 import java.util.UUID;
 
 @RestController
@@ -92,12 +95,23 @@ public class SolicitacaoController {
         @RequestParam(name = "status", required = false)
         StatusSolicitacao status,
         @RequestParam(name = "categoria", required = false)
-        CategoriaSolicitacao categoria
+        CategoriaSolicitacao categoria,
+        @RequestParam(name = "titulo", required = false)
+        String titulo,
+        @RequestParam(name = "dataInicial", required = false)
+        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+        LocalDate dataInicial,
+        @RequestParam(name = "dataFinal", required = false)
+        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+        LocalDate dataFinal
     ) {
         var resultado = listarSolicitacoesUseCase.executar(
             UUID.fromString(jwt.getSubject()),
             status,
             categoria,
+            titulo,
+            dataInicial,
+            dataFinal,
             page,
             size
         );

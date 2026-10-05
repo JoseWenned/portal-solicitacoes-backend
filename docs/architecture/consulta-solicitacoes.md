@@ -138,3 +138,38 @@ CI desta branch: pendente.
 - Não há busca textual nesta implementação.
 - Edição, exclusão, alteração de status e dashboard serão
   implementados em etapas próprias.
+
+## Filtros por título e período
+
+A listagem aceita os parâmetros opcionais titulo, dataInicial
+e dataFinal, combinados com os filtros existentes por AND.
+
+O título utiliza busca parcial sem diferenciação entre maiúsculas
+e minúsculas. Espaços externos são removidos; texto vazio não aplica
+filtro. O limite é de 150 pontos de código Unicode.
+Os caracteres % e _ são tratados literalmente.
+
+O período considera createdAt e datas no formato YYYY-MM-DD,
+interpretadas no fuso America/Sao_Paulo.
+
+A data inicial é inclusiva. A data final inclui todo o dia informado,
+utilizando o início do dia seguinte como limite exclusivo.
+
+É possível informar somente uma das datas.
+Intervalo invertido ou data malformada retorna HTTP 400.
+
+Todas as buscas e seus totais permanecem limitados ao proprietário.
+
+### Validação
+
+- Testes HTTP da listagem: 18 execuções aprovadas.
+- Busca parcial por título, normalização de espaços e comparação
+  sem diferenciação de maiúsculas e minúsculas verificadas.
+- Caracteres % e _ tratados como texto literal.
+- Limites inclusivos do período no fuso America/Sao_Paulo verificados.
+- Consulta com apenas uma das datas verificada.
+- Combinação de todos os filtros e isolamento por proprietário verificados.
+- Intervalo invertido e datas malformadas retornam HTTP 400.
+- Suíte completa: 153 testes, sem falhas, erros ou testes ignorados.
+- ./mvnw verify: BUILD SUCCESS.
+- CI desta branch: pendente.

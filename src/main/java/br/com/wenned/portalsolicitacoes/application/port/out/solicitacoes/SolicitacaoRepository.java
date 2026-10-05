@@ -5,6 +5,7 @@ import br.com.wenned.portalsolicitacoes.domain.entity.solicitacoes.CategoriaSoli
 import br.com.wenned.portalsolicitacoes.domain.entity.solicitacoes.Solicitacao;
 import br.com.wenned.portalsolicitacoes.domain.entity.solicitacoes.StatusSolicitacao;
 
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -17,10 +18,26 @@ public interface SolicitacaoRepository {
         UUID solicitanteId
     );
 
+    default PaginaResultadoDTO<Solicitacao> listarPorProprietario(
+        UUID solicitanteId,
+        StatusSolicitacao status,
+        CategoriaSolicitacao categoria,
+        int page,
+        int size
+    ) {
+        return listarPorProprietario(
+            solicitanteId, status, categoria,
+            null, null, null, page, size
+        );
+    }
+
     PaginaResultadoDTO<Solicitacao> listarPorProprietario(
         UUID solicitanteId,
         StatusSolicitacao status,
         CategoriaSolicitacao categoria,
+        String titulo,
+        Instant inicioInclusivo,
+        Instant fimExclusivo,
         int page,
         int size
     );

@@ -8,6 +8,7 @@ import br.com.wenned.portalsolicitacoes.domain.entity.solicitacoes.StatusSolicit
 import br.com.wenned.portalsolicitacoes.infrastructure.persistence.mapper.solicitacoes.SolicitacaoMapper;
 import br.com.wenned.portalsolicitacoes.infrastructure.persistence.model.solicitacoes.SolicitacaoModel;
 import br.com.wenned.portalsolicitacoes.infrastructure.persistence.repository.solicitacoes.SolicitacaoRepositorioJPA;
+
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.PageRequest;
@@ -16,7 +17,9 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -75,6 +78,24 @@ public class SolicitacaoRepositoryAdapter implements SolicitacaoRepository {
         int page,
         int size
     ) {
+        return listarPorProprietario(
+            solicitanteId, status, categoria,
+            null, null, null, page, size
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PaginaResultadoDTO<Solicitacao> listarPorProprietario(
+        UUID solicitanteId,
+        StatusSolicitacao status,
+        CategoriaSolicitacao categoria,
+        String titulo,
+        Instant inicioInclusivo,
+        Instant fimExclusivo,
+        int page,
+        int size
+    ) {
         Objects.requireNonNull(solicitanteId, "Solicitante obrigatório.");
 
         Specification<SolicitacaoModel> filtros = (root, query, builder) -> {
@@ -91,6 +112,38 @@ public class SolicitacaoRepositoryAdapter implements SolicitacaoRepository {
             if (categoria != null) {
                 predicates.add(
                     builder.equal(root.get("categoria"), categoria)
+                );
+            }
+
+            if (titulo != null && !titulo.isBlank()) {
+                String texto = escaparLike(
+                    titulo.strip().toLowerCase(Locale.ROOT)
+                );
+
+                predicates.add(
+                    builder.like(
+                        builder.lower(root.<String>get("titulo")),
+                        "%" + texto + "%",
+                        '\\'
+                    )
+                );
+            }
+
+            if (inicioInclusivo != null) {
+                predicates.add(
+                    builder.greaterThanOrEqualTo(
+                        root.<Instant>get("createdAt"),
+                        inicioInclusivo
+                    )
+                );
+            }
+
+            if (fimExclusivo != null) {
+                predicates.add(
+                    builder.lessThan(
+                        root.<Instant>get("createdAt"),
+                        fimExclusivo
+                    )
                 );
             }
 
@@ -197,5 +250,12 @@ public class SolicitacaoRepositoryAdapter implements SolicitacaoRepository {
             versaoEsperada,
             StatusSolicitacao.ABERTO
         ) == 1;
+    }
+
+    private static String escaparLike(String texto) {
+        return texto
+            .replace("\\", "\\\\")
+            .replace("%", "\\%")
+            .replace("_", "\\_");
     }
 }

@@ -69,3 +69,33 @@ Não representam execução independente pela LLM.
 - Execução da CI desta branch.
 - Edição, exclusão, alteração de status e dashboard
   em etapas posteriores.
+
+## Complementação dos filtros obrigatórios
+
+Após conferir o enunciado, foram identificados dois filtros ainda
+ausentes: período de criação e texto livre no título.
+
+### Apoio recebido
+
+- Ampliação da porta de persistência e do caso de uso de listagem.
+- Conversão de datas locais para instantes no fuso America/Sao_Paulo.
+- Busca parcial por título com escape dos caracteres especiais de LIKE.
+- Integração dos parâmetros ao controller.
+- Ampliação dos testes HTTP existentes, reutilizando seus helpers.
+
+### Decisões adotadas
+
+- Combinar todos os filtros por AND.
+- Preservar a condição obrigatória de proprietário.
+- Considerar datas inicial e final inclusivas.
+- Representar o final do período pelo início exclusivo do dia seguinte.
+- Permitir consulta com apenas um limite de data.
+- Tratar título vazio como ausência de filtro.
+- Preservar as assinaturas anteriores por sobrecarga.
+
+### Evidências informadas pelo desenvolvedor
+
+- Testes da listagem: 18 execuções aprovadas.
+- Suíte completa: 153 testes, sem falhas, erros ou testes ignorados.
+- Maven verify: BUILD SUCCESS.
+- CI desta branch: pendente.

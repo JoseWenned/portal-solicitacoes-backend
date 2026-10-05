@@ -24,7 +24,7 @@ Implementado e validado localmente:
 - Sessões revogáveis com validade absoluta de oito horas.
 - Rotação do refresh token sem extensão da validade da sessão.
 - Logout com revogação por refresh cookie ou JWT válido.
-- Logout com JWT válido mesmo após rotação do refresh cookie.
+- Logout com JWT válido mesmo quando o refresh cookie está desatualizado.
 - Validação da sessão associada ao JWT nos acessos protegidos.
 - Proteção CSRF nos endpoints de login, renovação e logout.
 - Consulta do usuário autenticado.
@@ -32,7 +32,7 @@ Implementado e validado localmente:
 - Status inicial ABERTO e código numérico gerado pelo PostgreSQL.
 - Consulta individual limitada ao proprietário.
 - Listagem paginada limitada ao proprietário.
-- Filtros por status e categoria.
+- Filtros por status, categoria, título e período de criação.
 - Edição de solicitações próprias somente em ABERTO.
 - Exclusão física de solicitações próprias somente em ABERTO.
 - Alteração de status no fluxo ABERTO → EM_ATENDIMENTO → CONCLUIDO.
@@ -44,16 +44,19 @@ Implementado e validado localmente:
 - Dockerfile e Docker Compose.
 - Workflow de CI para verificação Maven e build Docker.
 
-A suíte local possui 146 testes aprovados.
+A suíte local possui 153 testes aprovados, sem falhas, erros
+ou testes ignorados.
 
 Ainda pendentes:
 
 - Frontend e integração completa pelos proxies.
 - Coordenação de renovação e logout no frontend.
 - Testes de navegador do fluxo integrado.
-- Consolidação do Memorial Técnico.
+- Dicionário de dados.
+- Consolidação do Memorial Técnico de Desenvolvimento.
+- Instruções completas de demonstração e execução integrada.
 
-A CI da branch de revisão da integração permanece pendente.
+A CI da branch de filtros por período e título aguarda confirmação.
 
 ## Tecnologias utilizadas
 
@@ -73,10 +76,10 @@ A CI da branch de revisão da integração permanece pendente.
 
 O backend é organizado por camadas:
 
-- domain: entidades e regras de domínio.
-- application: casos de uso, portas e resultados.
-- infrastructure: persistência, mappers, segurança e configuração.
-- presentation: controllers, DTOs e tratamento de erros HTTP.
+- `domain`: entidades e regras de domínio.
+- `application`: casos de uso, portas e resultados.
+- `infrastructure`: persistência, mappers, segurança e configuração.
+- `presentation`: controllers, DTOs e tratamento de erros HTTP.
 
 Dentro das camadas, os arquivos são agrupados por responsabilidade
 e conceito de negócio.
@@ -85,7 +88,7 @@ Domínio e aplicação permanecem independentes de Spring e JPA.
 Os modelos de persistência são separados das entidades de domínio.
 As conversões são realizadas por mappers específicos.
 
-O contrato de paginação da aplicação não depende de Page ou Pageable
+O contrato de paginação da aplicação não depende de `Page` ou `Pageable`
 do Spring Data.
 
 ## Pré-requisitos
@@ -95,6 +98,7 @@ Para executar pelo Docker Compose:
 - Docker com daemon acessível.
 - Docker Compose.
 - Python 3 para gerar a chave JWT pelo exemplo abaixo.
+- Acesso à internet para baixar as imagens e dependências.
 
 Para executar o Java diretamente no Ubuntu/WSL:
 
@@ -157,7 +161,9 @@ indexes = [
 ]
 
 if len(indexes) > 1:
-    raise SystemExit("Há entradas duplicadas de JWT_SECRET_BASE64. Corrija o arquivo.")
+    raise SystemExit(
+        "Há entradas duplicadas de JWT_SECRET_BASE64. Corrija o arquivo."
+    )
 
 if indexes and lines[indexes[0]].split("=", 1)[1].strip():
     print("JWT_SECRET_BASE64 já possui um valor. Chave preservada.")
@@ -257,8 +263,11 @@ chmod +x mvnw
 ./mvnw spring-boot:run
 ```
 
-Se você alterou a porta, o nome do banco ou o usuário,
+Se você alterou a porta do banco, o nome do banco ou o usuário,
 ajuste as variáveis correspondentes.
+
+A porta do Java local é 8080 conforme a configuração da aplicação.
+`BACKEND_PORT` controla o mapeamento do Compose.
 
 ## Endpoints disponíveis
 
@@ -311,10 +320,30 @@ O cadastro não autentica automaticamente o usuário.
 - Senha sem remoção de espaços ou normalização.
 - Hash BCrypt com custo 12.
 
+### Usuário para demonstração local
+
+Não há criação automática de usuários.
+
+Após executar o cadastro do exemplo em um banco novo, utilize:
+
+| Campo | Valor |
+|---|---|
+| E-mail | ana.cadastro@example.com |
+| Senha | Teste12345! |
+
+Essas credenciais são apenas um exemplo de demonstração local.
+O usuário precisa ser cadastrado antes do login.
+
+Se esse e-mail já estiver cadastrado, o endpoint retorna HTTP 409.
+Utilize a senha definida no cadastro existente ou cadastre outro e-mail.
+
+A tela de cadastro e as instruções da demonstração integrada
+serão adicionadas durante o desenvolvimento do frontend.
+
 ## Autenticação
 
-O login retorna um access token JWT e envia o refresh token
-somente por cookie HttpOnly.
+O login recebe `email` e `password`, retorna um access token JWT
+e envia o refresh token somente por cookie HttpOnly.
 
 O access token possui validade máxima de 15 minutos,
 limitada pela expiração da sessão.
@@ -344,7 +373,7 @@ ambas são revogadas.
 Após a revogação, os JWTs associados à sessão são rejeitados.
 
 Bearer inválido ou expirado retorna HTTP 401.
-Chamadas somente por cookie devem omitir Authorization.
+Chamadas somente por cookie devem omitir `Authorization`.
 
 Logout somente com cookie antigo pode não identificar a sessão
 após uma rotação. O frontend deverá coordenar renovação e logout
@@ -429,7 +458,7 @@ o mesmo código e mensagem de erro.
 ## Listagem e filtros
 
 ```http
-GET /api/v1/solicitacoes?page=0&size=20&status=ABERTO&categoria=TI
+GET /api/v1/solicitacoes?page=0&size=20&status=ABERTO&categoria=TI&titulo=computador&dataInicial=2026-10-01&dataFinal=2026-10-05
 Authorization: Bearer <access-token>
 ```
 
@@ -439,6 +468,9 @@ Authorization: Bearer <access-token>
 | size | De 1 a 100; padrão 20 |
 | status | Opcional: ABERTO, EM_ATENDIMENTO ou CONCLUIDO |
 | categoria | Opcional: TI, RH, COMPRAS, FINANCEIRO ou INFRAESTRUTURA |
+| titulo | Busca parcial, sem diferenciar maiúsculas e minúsculas; até 150 pontos de código Unicode |
+| dataInicial | Data inicial inclusiva, no formato YYYY-MM-DD |
+| dataFinal | Data final inclusiva, no formato YYYY-MM-DD |
 
 Os filtros são combinados com AND.
 A ordenação é `createdAt DESC, codigo DESC`.
@@ -446,7 +478,34 @@ A ordenação é `createdAt DESC, codigo DESC`.
 Conteúdo e totais consideram somente as solicitações do usuário
 autenticado que correspondam aos filtros.
 
-Formato da resposta:
+### Busca por título
+
+A pesquisa utiliza correspondência parcial.
+
+Espaços externos são removidos.
+Título vazio ou composto somente de espaços não aplica filtro.
+
+Os caracteres `%` e `_` são tratados como texto literal,
+sem funcionar como curingas SQL.
+
+A busca não diferencia maiúsculas e minúsculas.
+Não há remoção explícita de acentos.
+
+### Período de criação
+
+As datas filtram `createdAt` e são interpretadas no fuso
+`America/Sao_Paulo`.
+
+A data inicial inclui o início do dia informado.
+A data final inclui todo o dia informado, utilizando internamente
+o início do dia seguinte como limite exclusivo.
+
+É possível informar somente uma das datas.
+
+Data inicial posterior à data final retorna HTTP 400.
+Datas malformadas também retornam HTTP 400.
+
+### Resposta da listagem
 
 ```json
 {
@@ -461,7 +520,7 @@ Formato da resposta:
 Página além do intervalo retorna HTTP 200 com conteúdo vazio
 e totais preservados.
 
-Paginação inválida ou enum desconhecido retorna HTTP 400.
+Paginação inválida, enum desconhecido ou filtro inválido retorna HTTP 400.
 Ausência de autenticação retorna HTTP 401.
 
 ## Edição de solicitações
@@ -668,13 +727,13 @@ Para executar testes específicos:
 
 ### Validação local mais recente
 
-- Suíte completa: 146 testes.
+- Suíte completa: 153 testes.
 - Nenhuma falha, erro ou teste ignorado.
 - Maven verify: BUILD SUCCESS.
 - Autenticação HTTP: cinco execuções aprovadas.
 - Criação de solicitações HTTP: dez execuções aprovadas.
 - Consulta individual HTTP: cinco testes aprovados.
-- Listagem HTTP: onze execuções aprovadas.
+- Listagem HTTP: dezoito execuções aprovadas.
 - Operações de solicitações HTTP: quatorze execuções aprovadas.
 - Condições de escrita: três testes de persistência aprovados.
 - Dashboard HTTP: quatro testes aprovados.
@@ -684,12 +743,17 @@ Para executar testes específicos:
 - Logout com cookie antigo e JWT válido verificado.
 - Isolamento de consultas, listagem, totais e dashboard verificado.
 - Paginação, ordenação e filtros individuais e combinados verificados.
+- Busca parcial por título sem diferenciação de caixa verificada.
+- Normalização de espaços e tratamento literal de `%` e `_` verificados.
+- Limites do período no fuso America/Sao_Paulo verificados.
+- Consulta com apenas um limite de data verificada.
+- Intervalo invertido e datas malformadas retornam HTTP 400.
 - Edição, exclusão física e transições de status verificadas.
 - Escritas com versão antiga, status incompatível e proprietário
   incorreto recusadas sem alteração indevida do registro.
 - Swagger UI acessível no navegador e por GET com HTTP 200.
 - Contrato OpenAPI com dez caminhos e códigos 201/204 conferidos.
-- Dashboard sem JWT continua retornando HTTP 401.
+- Dashboard sem JWT retorna HTTP 401.
 
 Os testes de condições de escrita e logout após rotação
 reproduzem os cenários sequencialmente, sem múltiplas threads.
@@ -710,7 +774,7 @@ na verificação Maven.
 Não há publicação automática de imagens nem deploy automático.
 
 A execução local não substitui a validação da CI.
-O resultado da CI da branch de revisão da integração
+O resultado da CI da branch de filtros por período e título
 será registrado após sua execução.
 
 ## Limitações atuais
@@ -720,7 +784,8 @@ será registrado após sua execução.
 - Logout somente com refresh cookie antigo pode não identificar
   a sessão após rotação.
 - Bearer inválido ou expirado impede a execução do logout com esse header.
-- Ordenação fixa e ausência de busca textual.
+- Ordenação fixa por data de criação e código em ordem decrescente.
+- Busca por título sem remoção explícita de acentos.
 - Testes de persistência não simulam múltiplas threads concorrentes.
 - Não há detecção específica de formulários antigos no cliente.
 - Política explícita para campos JSON desconhecidos ainda pendente.
@@ -729,7 +794,9 @@ será registrado após sua execução.
   diferenças de estrutura.
 - OpenAPI documenta códigos e descrições de erros,
   mas seus schemas ainda não foram detalhados na configuração.
+- Dicionário de dados ainda será documentado.
 - Memorial Técnico ainda será consolidado.
+- Instruções de execução integrada e demonstração pelo frontend pendentes.
 
 ## Documentação
 
@@ -754,8 +821,9 @@ será registrado após sua execução.
 - [Registro de LLM: documentação da API](docs/llm/documentacao-api.md)
 - [Registro de LLM: revisão da integração](docs/llm/revisao-integracao-backend.md)
 
-O Memorial Técnico de Desenvolvimento será consolidado
-durante a integração e preparação da entrega.
+O Memorial Técnico de Desenvolvimento reunirá as tecnologias utilizadas,
+suas justificativas, as decisões arquiteturais, o processo de desenvolvimento,
+as evidências de validação e a análise crítica da solução.
 
 ## Frontend
 
