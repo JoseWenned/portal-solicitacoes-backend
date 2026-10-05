@@ -42,3 +42,14 @@ portal:
     access-token-validade: 15m
     sessao-validade: 8h
     cookie-secure: ${AUTH_COOKIE_SECURE:false}
+
+springdoc:
+  packages-to-scan: br.com.wenned.portalsolicitacoes.presentation.controller
+  paths-to-match: /api/v1/**
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+    persist-authorization: false
+    operations-sorter: method
+    tags-sorter: alpha
