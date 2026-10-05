@@ -1,4 +1,4 @@
-package br.com.wenned.portalsolicitacoes.infrastructure.persistence.adapter;
+package br.com.wenned.portalsolicitacoes.infrastructure.persistence.adapter.autenticacao;
 
 import org.springframework.test.context.ActiveProfiles;
 
