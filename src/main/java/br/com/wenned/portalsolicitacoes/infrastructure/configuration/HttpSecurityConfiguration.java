@@ -1,10 +1,8 @@
 package br.com.wenned.portalsolicitacoes.infrastructure.configuration;
 
 import br.com.wenned.portalsolicitacoes.application.port.out.autenticacao.SessaoAutenticacaoRepository;
-
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletResponse;
-
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -48,8 +46,8 @@ public class HttpSecurityConfiguration {
 
         OAuth2TokenValidator<Jwt> applicationValidator = jwt -> {
             if (jwt.getExpiresAt() == null
-                    || !jwt.getExpiresAt().isAfter(clock.instant())
-                    || !jwt.getAudience().contains(audience)) {
+                || !jwt.getExpiresAt().isAfter(clock.instant())
+                || !jwt.getAudience().contains(audience)) {
                 return invalidToken();
             }
 
@@ -64,10 +62,11 @@ public class HttpSecurityConfiguration {
             }
 
             boolean active = sessoes.findById(sessaoId)
-                    .filter(sessao ->
-                        sessao.getUsuarioId().equals(usuarioId) && sessao.estaAtiva(clock.instant())
-                    )
-                    .isPresent();
+                .filter(sessao ->
+                    sessao.getUsuarioId().equals(usuarioId)
+                        && sessao.estaAtiva(clock.instant())
+                )
+                .isPresent();
 
             return active
                 ? OAuth2TokenValidatorResult.success()
@@ -111,61 +110,68 @@ public class HttpSecurityConfiguration {
         };
 
         http
-                .sessionManagement(session -> session
-                    .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+            .sessionManagement(session -> session
+                .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+            )
+            .formLogin(AbstractHttpConfigurer::disable)
+            .httpBasic(AbstractHttpConfigurer::disable)
+            .logout(AbstractHttpConfigurer::disable)
+            .requestCache(AbstractHttpConfigurer::disable)
+            .csrf(csrf -> csrf
+                .csrfTokenRepository(csrfRepository)
+                .requireCsrfProtectionMatcher(csrfRequired)
+            )
+            .authorizeHttpRequests(authorize -> authorize
+                .dispatcherTypeMatchers(DispatcherType.ERROR)
+                .permitAll()
+                .requestMatchers(
+                    HttpMethod.GET,
+                    "/actuator/health",
+                    "/actuator/health/**",
+                    "/api/v1/auth/csrf",
+                    "/v3/api-docs",
+                    "/v3/api-docs/**",
+                    "/swagger-ui.html",
+                    "/swagger-ui/**"
+                ).permitAll()
+                .requestMatchers(
+                    HttpMethod.POST,
+                    "/api/v1/usuarios",
+                    "/api/v1/auth/login",
+                    "/api/v1/auth/refresh",
+                    "/api/v1/auth/logout"
+                ).permitAll()
+                .anyRequest().authenticated()
+            )
+            .exceptionHandling(errors -> errors
+                .authenticationEntryPoint((request, response, exception) ->
+                    writeError(
+                        response,
+                        401,
+                        "UNAUTHORIZED",
+                        "Autenticação necessária ou inválida."
+                    )
                 )
-                .formLogin(AbstractHttpConfigurer::disable)
-                .httpBasic(AbstractHttpConfigurer::disable)
-                .logout(AbstractHttpConfigurer::disable)
-                .requestCache(AbstractHttpConfigurer::disable)
-                .csrf(csrf -> csrf
-                    .csrfTokenRepository(csrfRepository)
-                    .requireCsrfProtectionMatcher(csrfRequired)
+                .accessDeniedHandler((request, response, exception) ->
+                    writeError(
+                        response,
+                        403,
+                        "ACCESS_DENIED",
+                        "Acesso negado ou token CSRF inválido."
+                    )
                 )
-                .authorizeHttpRequests(authorize -> authorize
-                    .dispatcherTypeMatchers(DispatcherType.ERROR)
-                    .permitAll()
-                    .requestMatchers(
-                        HttpMethod.GET,
-                        "/actuator/health",
-                        "/actuator/health/**",
-                        "/api/v1/auth/csrf"
-                    ).permitAll()
-                    .requestMatchers(
-                        HttpMethod.POST,
-                        "/api/v1/usuarios",
-                        "/api/v1/auth/login",
-                        "/api/v1/auth/refresh",
-                        "/api/v1/auth/logout"
-                    ).permitAll()
-                    .anyRequest().authenticated()
+            )
+            .oauth2ResourceServer(resourceServer -> resourceServer
+                .jwt(jwt -> {})
+                .authenticationEntryPoint((request, response, exception) ->
+                    writeError(
+                        response,
+                        401,
+                        "UNAUTHORIZED",
+                        "Autenticação necessária ou inválida."
+                    )
                 )
-                .exceptionHandling(errors -> errors
-                        .authenticationEntryPoint((request, response, exception) ->
-                                writeError(
-                                    response, 401,
-                                    "UNAUTHORIZED",
-                                    "Autenticação necessária ou inválida."
-                                )
-                        )
-                        .accessDeniedHandler((request, response, exception) ->
-                                writeError(
-                                    response, 403,
-                                    "ACCESS_DENIED",
-                                    "Acesso negado ou token CSRF inválido."
-                                )
-                        )
-                )
-                .oauth2ResourceServer(resourceServer -> resourceServer
-                        .jwt(jwt -> {})
-                        .authenticationEntryPoint((request, response, exception) ->
-                                writeError(
-                                    response, 401,
-                                    "UNAUTHORIZED",
-                                    "Autenticação necessária ou inválida."
-                                )
-                        )
-                );
+            );
 
         return http.build();
     }
@@ -192,10 +198,10 @@ public class HttpSecurityConfiguration {
         response.setHeader("Cache-Control", "no-store");
 
         response.getWriter().write(
-                "{\"status\":" + status
-                    + ",\"code\":\"" + code
-                    + "\",\"message\":\"" + message
-                    + "\",\"fieldErrors\":[]}"
+            "{\"status\":" + status
+                + ",\"code\":\"" + code
+                + "\",\"message\":\"" + message
+                + "\",\"fieldErrors\":[]}"
         );
     }
 }

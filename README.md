@@ -557,6 +557,23 @@ A resposta utiliza Cache-Control: no-store.
 As contagens são calculadas em uma única consulta ao PostgreSQL,
 sem carregar as solicitações em memória.
 
+## Documentação interativa da API
+
+Com o backend em execução:
+
+- Swagger UI: http://localhost:8080/swagger-ui/index.html
+- Contrato OpenAPI: http://localhost:8080/v3/api-docs
+
+A documentação é pública.
+Os endpoints de negócio preservam suas exigências de autenticação,
+propriedade e CSRF.
+
+No Swagger, utilize Authorize para informar o access token Bearer.
+Para login, renovação e logout, obtenha o token em
+GET /api/v1/auth/csrf e informe-o em csrfToken.
+
+O navegador preserva os cookies HttpOnly.
+
 ## Testes
 
 Com o Docker acessível:
@@ -657,6 +674,8 @@ será registrado após sua execução.
 - [Registro de LLM: operações](docs/llm/operacoes-solicitacoes.md)
 - [Arquitetura do dashboard](docs/architecture/dashboard-usuario.md)
 - [Registro de LLM: dashboard](docs/llm/dashboard-usuario.md)
+- [Arquitetura da documentação da API](docs/architecture/documentacao-api.md)
+- [Registro de LLM: documentação da API](docs/llm/documentacao-api.md)
 
 O Memorial Técnico de Desenvolvimento será consolidado
 ao longo das próximas etapas.
